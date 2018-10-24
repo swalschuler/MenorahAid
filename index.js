@@ -10,10 +10,13 @@
 
 'use strict';
 const Alexa = require('alexa-sdk');
-//const axios = require('axios');
+const axios = require('axios');
 //const ziptz = require('zipcode-to-timezone');
-//const moment = require('moment-timezone');
+const moment = require('moment-timezone');
 
+const POSTAL_REQUIRED_ERROR = 'POSTAL_REQUIRED_ERROR'
+const GOOGLE_MAP_GEOCODE_EMPTY_RESULT = 'GOOGLE_MAP_GEOCODE_EMPTY_RESULT'
+const GOOGLE_MAP_TIMEZONE_EMPTY_RESULT = 'GOOGLE_MAP_TIMEZONE_EMPTY_RESULT'
 
 //=========================================================================================================================================
 //TODO: The items below this comment need your attention.
@@ -79,13 +82,25 @@ const handlers = {
         const factArr = data;
         const factIndex = Math.floor(Math.random() * factArr.length);
         const randomFact = factArr[factIndex];
-        var d = input.requestEnvelope.request.intent.slots.Date.value;
-        const speechOutput = d;//GET_FACT_MESSAGE + randomFact;
-        //getDate();
-        
-        this.response.cardRenderer(SKILL_NAME, randomFact);
-        this.response.speak(speechOutput);
-        this.emit(':responseReady');
+
+        const speechOutput = "Hello";//GET_FACT_MESSAGE + randomFact;
+
+        const ctx = this
+        getDate.call(this, (err, dateTime) => {
+            if (err) {
+                if (err === POSTAL_REQUIRED_ERROR) {
+                    ctx.emit(':tell', "please give permission")
+                } else {
+                    ctx.emit(':tell', "something went wrong")
+                }
+            } else {
+                ctx.emit(':tell', "Got the date")
+            }
+        })
+
+        //this.response.cardRenderer(SKILL_NAME, randomFact);
+        //this.response.speak(speechOutput);
+        //this.emit(':responseReady');
     },
     'AMAZON.HelpIntent': function () {
         const speechOutput = HELP_MESSAGE;
@@ -110,3 +125,73 @@ exports.handler = function (event, context, callback) {
     alexa.registerHandlers(handlers);
     alexa.execute();
 };
+
+
+function getDate(callback) {
+    const userId = this.event.session.user.userId
+    const consentToken = this.event.session.user.permissions && this.event.session.user.permissions.consentToken
+    const deviceId = this.event.context.System.device.deviceId
+    let countryCode = ''
+    let postalCode = ''
+    let lat = 0
+    let lng = 0
+    let city = ''
+    let state = ''
+    let timeZoneId = ''
+
+    console.log("Hello!")
+    console.log(consentToken)
+    
+    if (!consentToken || !deviceId) {
+        console.error('ERROR updateUserLocation.POSTAL_REQUIRED_ERROR', consentToken, deviceId)
+        callback(POSTAL_REQUIRED_ERROR, "")
+    }
+
+    axios.get(`https://api.amazonalexa.com/v1/devices/${deviceId}/settings/address/countryAndPostalCode`, {
+        headers: { 'Authorization': `Bearer ${consentToken}` }
+    })
+        .then((response) => {
+            if (!response.data || !response.data.countryCode || !response.data.postalCode) {
+                console.error('ERROR updateUserLocation.POSTAL_REQUIRED_ERROR', consentToken, deviceId, response.data)
+                callback(POSTAL_REQUIRED_ERROR, "")
+            } else {
+                countryCode = response.data.countryCode
+                postalCode = response.data.postalCode
+                console.log("Request string: '" + `https://maps.googleapis.com/maps/api/geocode/json?address=${countryCode},${postalCode}&key=${process.env.GOOGLE_MAPS_KEY}` + "'")
+                return axios.get(`https://maps.googleapis.com/maps/api/geocode/json?address=${countryCode},${postalCode}&key=${process.env.GOOGLE_MAPS_KEY}`)
+            }
+        })
+        .then((response) => {
+            if (!response.data || !response.data.results || !response.data.results[0] ||
+                !response.data.results[0].address_components || !response.data.results[0].geometry) {
+                console.error('ERROR updateUserLocation.GOOGLE_MAP_GEOCODE_EMPTY_RESULT', response)
+                console.log("country code: " + countryCode + "postal code: " + postalCode)
+                callback(GOOGLE_MAP_GEOCODE_EMPTY_RESULT, "")
+            } else {
+                city = response.data.results[0].address_components[1].short_name
+                state = response.data.results[0].address_components[3].short_name
+                lat = response.data.results[0].geometry.location.lat
+                lng = response.data.results[0].geometry.location.lng
+                return axios.get(`https://maps.googleapis.com/maps/api/timezone/json?location=${lat},${lng}&timestamp=${moment().unix()}&key=${process.env.GOOGLE_MAPS_KEY}`)
+            }
+        })
+        .then((response) => {
+            if (!response.data || !response.data.timeZoneId) {
+                console.error('ERROR updateUserLocation.GOOGLE_MAP_TIMEZONE_EMPTY_RESULT', response)
+                callback(GOOGLE_MAP_TIMEZONE_EMPTY_RESULT, "")
+            } else {
+                timeZoneId = response.data.timeZoneId
+                const currDate = new moment()
+                const userDatetime = currDate.tz(timeZoneId).format('YYYY-MM-DD HH:mm')
+                callback(false, userDatetime)
+            }
+        })
+        .catch((err) => {
+            console.error('ERROR updateUserLocation.POSTAL_REQUIRED_ERROR', err)
+            if (!consentToken || !deviceId) {
+                callback(POSTAL_REQUIRED_ERROR, "")
+            } else {
+                callback(true)
+            }
+        })
+}

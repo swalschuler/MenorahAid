@@ -1,0 +1,10 @@
+{
+  "name": "chanukahskill",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "alexa-sdk": "^1.0.25",
+    "axios": "^0.17.1",
+    "moment-timezone": "^0.5.14"
+  }
+}
