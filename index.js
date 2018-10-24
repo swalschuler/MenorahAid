@@ -1,13 +1,4 @@
-/* eslint-disable  func-names */
-/* eslint quote-props: ["error", "consistent"]*/
-/**
- * This sample demonstrates a simple skill built with the Amazon Alexa Skills
- * nodejs skill development kit.
- * This sample supports multiple lauguages. (en-US, en-GB, de-DE).
- * The Intent Schema, Custom Slots and Sample Utterances for this skill, as well
- * as testing instructions are located at https://github.com/alexa/skill-sample-nodejs-fact
- **/
-
+// Time code based on https://github.com/cpenarrieta/baby-milk-tracker/blob/master/index.js
 'use strict';
 const Alexa = require('alexa-sdk');
 const axios = require('axios');
@@ -18,12 +9,6 @@ const POSTAL_REQUIRED_ERROR = 'POSTAL_REQUIRED_ERROR'
 const GOOGLE_MAP_GEOCODE_EMPTY_RESULT = 'GOOGLE_MAP_GEOCODE_EMPTY_RESULT'
 const GOOGLE_MAP_TIMEZONE_EMPTY_RESULT = 'GOOGLE_MAP_TIMEZONE_EMPTY_RESULT'
 
-//=========================================================================================================================================
-//TODO: The items below this comment need your attention.
-//=========================================================================================================================================
-
-//Replace with your app ID (OPTIONAL).  You can find this value at the top of your skill's page on http://developer.amazon.com.
-//Make sure to enclose your value in quotes, like this: const APP_ID = 'amzn1.ask.skill.bb4045e6-b3e8-4133-b650-72923c5980f1';
 const APP_ID = undefined;
 
 const SKILL_NAME = 'Space Facts';
@@ -32,75 +17,52 @@ const HELP_MESSAGE = 'You can say tell me a space fact, or, you can say exit... 
 const HELP_REPROMPT = 'What can I help you with?';
 const STOP_MESSAGE = 'Goodbye!';
 
-//=========================================================================================================================================
-//TODO: Replace this data with your own.  You can find translations of this data at http://github.com/alexa/skill-sample-node-js-fact/data
-//=========================================================================================================================================
-const data = [
-    'A year on Mercury is just 88 days long.',
-    'Despite being farther from the Sun, Venus experiences higher temperatures than Mercury.',
-    'Venus rotates counter-clockwise, possibly because of a collision in the past with an asteroid.',
-    'On Mars, the Sun appears about half the size as it does on Earth.',
-    'Earth is the only planet not named after a god.',
-    'Jupiter has the shortest day of all the planets.',
-    'The Milky Way galaxy will collide with the Andromeda Galaxy in about 5 billion years.',
-    'The Sun contains 99.86% of the mass in the Solar System.',
-    'The Sun is an almost perfect sphere.',
-    'A total solar eclipse can happen once every 1 to 2 years. This makes them a rare event.',
-    'Saturn radiates two and a half times more energy into space than it receives from the sun.',
-    'The temperature inside the Sun can reach 15 million degrees Celsius.',
-    'The Moon is moving approximately 3.8 cm away from our planet every year.',
-];
 
-//=========================================================================================================================================
-//Editing anything below this line might break your skill.
-//=========================================================================================================================================
-/*
-function getDate() {
-    const apiAccessToken = this.event.context.System.apiAccessToken;
-    const deviceId = this.event.context.System.device.deviceId;
-    let countryCode = '';
-    let postalCode = '';
+const START_DATE = moment('12/2/18')
+const nights = [
+    START_DATE,
+    START_DATE.clone().add(1, 'day'),
+    START_DATE.clone().add(2, 'day'),
+    START_DATE.clone().add(3, 'day'),
+    START_DATE.clone().add(4, 'day'),
+    START_DATE.clone().add(5, 'day'),
+    START_DATE.clone().add(6, 'day'),
+    START_DATE.clone().add(7, 'day'),
+]
 
-    axios.get(`https://api.amazonalexa.com/v1/devices/${deviceId}/settings/address/countryAndPostalCode`, {
-      headers: { 'Authorization': `Bearer ${apiAccessToken}` }
-    })
-    .then((response) => {
-        countryCode = response.data.countryCode;
-        postalCode = response.data.postalCode;
-        const tz = ziptz.lookup( postalCode );
-        const currDate = new moment();
-        const userDatetime = currDate.tz(tz).format('YYYY-MM-DD HH:mm');
-        console.log('Local Timezone Date/Time::::::: ', userDatetime);
-    })
-}
-*/
 const handlers = {
     'LaunchRequest': function () {
-        this.emit('HowManyCandlesIntent');
+        this.emit(':ask', "I can tell you how many candles to light or in what order to place them... What would you like to do?", "What can I help you with?");
     },
     'HowManyCandlesIntent': function (input) {
-        const factArr = data;
-        const factIndex = Math.floor(Math.random() * factArr.length);
-        const randomFact = factArr[factIndex];
-
-        const speechOutput = "Hello";//GET_FACT_MESSAGE + randomFact;
-
         const ctx = this
         getDate.call(this, (err, dateTime) => {
             if (err) {
                 if (err === POSTAL_REQUIRED_ERROR) {
-                    ctx.emit(':tell', "please give permission")
+                    ctx.emit(':tell', "Please make sure you have given permission for Menorah Aid to view your postal code in the Alexa App.")
                 } else {
-                    ctx.emit(':tell', "something went wrong")
+                    ctx.emit(':tell', "I'm sorry, something went wrong.")
                 }
             } else {
-                ctx.emit(':tell', "Got the date")
+                var night = 0
+                for (night = 0; night < 8; night++) {
+                    if (dateTime.isSame(nights[night], 'date')) {
+                        break
+                    }
+                }
+
+                if (night >= 8) {
+                    ctx.emit(':tell', "It's not CHanukah right now.")
+                } else {
+                    const speechNight = night + 1;
+                    ctx.emit(':tell', "You need to light " + speechNight + " candle" + (speechNight == 1 ? "" : "s") + "tonight. Happy Chanukah!")
+                }
+                
             }
         })
-
-        //this.response.cardRenderer(SKILL_NAME, randomFact);
-        //this.response.speak(speechOutput);
-        //this.emit(':responseReady');
+    },
+    'WhatOrderIntent': function() {
+        this.emit(':tell', "Place the shamash first. Then, place the other candles from right to left. Finally, use the shamash to light the other candles from left to right. Happy Chanukah!")
     },
     'AMAZON.HelpIntent': function () {
         const speechOutput = HELP_MESSAGE;
@@ -182,8 +144,7 @@ function getDate(callback) {
             } else {
                 timeZoneId = response.data.timeZoneId
                 const currDate = new moment()
-                const userDatetime = currDate.tz(timeZoneId).format('YYYY-MM-DD HH:mm')
-                callback(false, userDatetime)
+                callback(false, currDate)
             }
         })
         .catch((err) => {
