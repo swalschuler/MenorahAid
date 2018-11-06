@@ -11,9 +11,9 @@ const GOOGLE_MAP_TIMEZONE_EMPTY_RESULT = 'GOOGLE_MAP_TIMEZONE_EMPTY_RESULT'
 
 const APP_ID = undefined;
 
-const SKILL_NAME = 'Space Facts';
+const SKILL_NAME = 'Menorah Aid';
 const GET_FACT_MESSAGE = "Here's your fact: ";
-const HELP_MESSAGE = 'You can say tell me a space fact, or, you can say exit... What can I help you with?';
+const HELP_MESSAGE = 'You can ask me how many candles you should light, what order to place them in, or, you can say exit... What can I help you with?';
 const HELP_REPROMPT = 'What can I help you with?';
 const STOP_MESSAGE = 'Goodbye!';
 
@@ -77,6 +77,17 @@ const handlers = {
     },
     'AMAZON.StopIntent': function () {
         this.response.speak(STOP_MESSAGE);
+        this.emit(':responseReady');
+    },
+    'SessionEndedRequest': function () {
+        console.log("SessionEndedRequest Fulfilled");
+    },
+    'Unhandled': function () {
+        console.log("Unhandled request");
+        const speechOutput = HELP_MESSAGE;
+        const reprompt = HELP_REPROMPT;
+
+        this.response.speak(speechOutput).listen(reprompt);
         this.emit(':responseReady');
     },
 };
